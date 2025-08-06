@@ -2,7 +2,7 @@ from flask import Flask, request, jsonify
 from flasgger import Swagger
 import joblib
 import pandas as pd
-import os
+
 app = Flask(__name__)
 swagger = Swagger(app)
 
@@ -120,6 +120,8 @@ def predict():
         return jsonify({"error": str(e)}), 400
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5001))
+    import os
+
+    port = int(os.environ.get("PORT", 5001))  # fallback to 5001 locally
     app.run(host='0.0.0.0', port=port, debug=True)
 
