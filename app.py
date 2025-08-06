@@ -2,11 +2,11 @@ from flask import Flask, request, jsonify
 from flasgger import Swagger
 import joblib
 import pandas as pd
-
+import os
 app = Flask(__name__)
 swagger = Swagger(app)
 
-# Charger les objets sauvegardés
+# Charger les objets
 model = joblib.load('model_rf.pkl')
 imputer = joblib.load('imputer.pkl')
 scaler = joblib.load('scaler.pkl')
@@ -105,9 +105,11 @@ def predict():
         if missing_fields:
             return jsonify({"error": f"Champs manquants : {missing_fields}"}), 400
 
-        df = pd.DataFrame([data])
 
-        df_imputed = pd.DataFrame(imputer.transform(df), columns=df.columns)
+        df = pd.DataFrame([[data[field] for field in expected_fields]], columns=expected_fields)
+
+
+        df_imputed = pd.DataFrame(imputer.transform(df), columns=expected_fields)
         df_scaled = scaler.transform(df_imputed)
 
         proba = model.predict_proba(df_scaled)[0][1]
@@ -118,4 +120,6 @@ def predict():
         return jsonify({"error": str(e)}), 400
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5001))
+    app.run(host='0.0.0.0', port=port, debug=True)
+
