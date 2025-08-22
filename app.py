@@ -17,7 +17,27 @@ AUTH_USERNAME = os.getenv("AUTH_USERNAME", "admin")
 AUTH_PASSWORD = os.getenv("AUTH_PASSWORD", "admin123")
 
 app = Flask(__name__)
-swagger = Swagger(app)
+
+# Swagger avec JWT
+swagger_template = {
+    "swagger": "2.0",
+    "info": {
+        "title": "API Churn Banque",
+        "description": "API pour prédire le churn des clients bancaires",
+        "version": "1.0"
+    },
+    "securityDefinitions": {
+        "Bearer": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header",
+            "description": "JWT Authorization header using the Bearer scheme. Exemple: 'Bearer {token}'"
+        }
+    },
+    "security": [{"Bearer": []}]
+}
+
+swagger = Swagger(app, template=swagger_template)
 
 # Charger les objets ML
 model = joblib.load('model_rf.pkl')
@@ -46,7 +66,6 @@ def token_required(f):
         return f(*args, **kwargs)
     return decorated
 
-
 @app.route('/')
 def home():
     return jsonify({"message": "API Churn Banque fonctionne !"})
@@ -65,7 +84,6 @@ def login():
 
     return jsonify({"error": "Identifiants invalides"}), 401
 
-
 # Endpoint protégé pour prédiction
 @app.route('/predict', methods=['POST'])
 @token_required
@@ -75,10 +93,76 @@ def predict():
     ---
     tags:
       - Prédiction
+    security:
+      - Bearer: []
+    requestBody:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - CreditScore
+              - Age
+              - Tenure
+              - Balance
+              - NumOfProducts
+              - HasCrCard
+              - IsActiveMember
+              - EstimatedSalary
+              - Geography_Germany
+              - Geography_Spain
+              - Gender_Male
+            properties:
+              CreditScore:
+                type: integer
+                example: 600
+              Age:
+                type: integer
+                example: 40
+              Tenure:
+                type: integer
+                example: 3
+              Balance:
+                type: number
+                example: 60000.0
+              NumOfProducts:
+                type: integer
+                example: 2
+              HasCrCard:
+                type: integer
+                example: 1
+              IsActiveMember:
+                type: integer
+                example: 1
+              EstimatedSalary:
+                type: number
+                example: 50000.0
+              Geography_Germany:
+                type: integer
+                example: 0
+              Geography_Spain:
+                type: integer
+                example: 1
+              Gender_Male:
+                type: integer
+                example: 1
+    responses:
+      200:
+        description: Probabilité de churn prédite
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                churn_probability:
+                  type: number
+                  example: 0.31
+      400:
+        description: Erreur de validation
     """
     try:
         data = request.get_json()
-
         expected_fields = [
             "CreditScore", "Age", "Tenure", "Balance", "NumOfProducts",
             "HasCrCard", "IsActiveMember", "EstimatedSalary",
@@ -94,15 +178,11 @@ def predict():
         df_scaled = scaler.transform(df_imputed)
 
         proba = model.predict_proba(df_scaled)[0][1]
-
         return jsonify({"churn_probability": round(float(proba), 2)})
 
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 10000))
     app.run(host='0.0.0.0', port=port, debug=True)
-
-
